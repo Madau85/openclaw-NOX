@@ -250,6 +250,38 @@ function isConfigured() {
   }
 }
 
+function removeWhatsappPlugin() {
+  const cfgPath = configPath();
+  let raw;
+  try {
+    raw = fs.readFileSync(cfgPath, "utf8");
+  } catch {
+    return;
+  }
+  let cfg;
+  try {
+    cfg = JSON.parse(raw);
+  } catch {
+    return;
+  }
+  if (!cfg?.plugins?.entries?.whatsapp) {
+    return;
+  }
+  delete cfg.plugins.entries.whatsapp;
+  if (Object.keys(cfg.plugins.entries).length === 0) {
+    delete cfg.plugins.entries;
+  }
+  if (Object.keys(cfg.plugins).length === 0) {
+    delete cfg.plugins;
+  }
+  try {
+    fs.writeFileSync(cfgPath, JSON.stringify(cfg, null, 2) + "\n", "utf8");
+    log.info("plugins", "removed plugins.entries.whatsapp from config");
+  } catch (err) {
+    log.warn("plugins", `failed to write config after removing whatsapp: ${err.message}`);
+  }
+}
+
 async function syncAllowedOrigins() {
   const publicDomain = process.env.RAILWAY_PUBLIC_DOMAIN;
   if (!publicDomain) return;
@@ -1771,6 +1803,11 @@ const server = app.listen(PORT, () => {
   if (isConfigured()) {
     (async () => {
       try {
+        removeWhatsappPlugin();
+      } catch (err) {
+        log.warn("wrapper", `removeWhatsappPlugin failed: ${err.message}`);
+      }
+      try {
         log.info("wrapper", "running openclaw doctor --fix...");
         const dr = await runCmd(OPENCLAW_NODE, clawArgs(["doctor", "--fix"]));
         log.info("wrapper", `doctor --fix exit=${dr.code}`);
@@ -1783,6 +1820,7 @@ const server = app.listen(PORT, () => {
       log.error("wrapper", `failed to start gateway at boot: ${err.message}`);
     });
   }
+
 });
 
 const tuiWss = createTuiWebSocketServer(server);
